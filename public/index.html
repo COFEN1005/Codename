@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11100e">
+  <title>SIGNAL WORDS — 4人用ワードゲーム</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="ホーム"><span class="brand-mark">S</span><span>SIGNAL<br>WORDS</span></a>
+    <div id="room-badge" class="room-badge hidden"><span>ROOM</span><strong id="room-code"></strong><button id="copy-room" class="icon-button" title="招待リンクをコピー">⧉</button></div>
+  </header>
+
+  <main>
+    <section id="home" class="home-view">
+      <div class="hero-copy">
+        <p class="eyebrow">FOUR PLAYERS · TWO TEAMS · ONE SIGNAL</p>
+        <h1>言葉ひとつで、<br><em>仲間を導け。</em></h1>
+        <p class="lead">2対2で遊ぶ、リアルタイム連想ワードゲーム。<br>ブラウザだけで、すぐに作戦開始。</p>
+      </div>
+      <div class="entry-card">
+        <label for="player-name">あなたのコードネーム</label>
+        <input id="player-name" maxlength="16" autocomplete="nickname" placeholder="例：ハヤブサ">
+        <button id="create-room" class="primary-button">新しいルームを作る <span>→</span></button>
+        <div class="divider"><span>または招待コードで参加</span></div>
+        <div class="join-row">
+          <input id="join-code" maxlength="5" autocomplete="off" placeholder="ABCDE">
+          <button id="join-room" class="secondary-button">参加</button>
+        </div>
+      </div>
+      <div class="deco-card red">灯台</div><div class="deco-card blue">銀河</div><div class="deco-card cream">羅針盤</div>
+    </section>
+
+    <section id="room" class="room-view hidden">
+      <div class="status-strip">
+        <div><span class="status-dot"></span><span id="game-message">プレイヤーを待っています</span></div>
+        <div id="turn-chip" class="turn-chip hidden"></div>
+      </div>
+
+      <div id="lobby" class="lobby-grid">
+        <section class="panel seats-panel">
+          <div class="section-heading"><div><p class="eyebrow">TEAM ASSIGNMENT</p><h2>4つの席を埋める</h2></div><span id="player-count">1 / 4</span></div>
+          <div class="teams">
+            <div class="team-column red-team"><h3><span></span> RED</h3><div id="red-master" class="seat"></div><div id="red-agent" class="seat"></div></div>
+            <div class="versus">VS</div>
+            <div class="team-column blue-team"><h3><span></span> BLUE</h3><div id="blue-master" class="seat"></div><div id="blue-agent" class="seat"></div></div>
+          </div>
+          <button id="start-game" class="primary-button" disabled>4人そろったらゲーム開始 <span>→</span></button>
+          <p class="hint-text">席をクリックすると、空いている役割へ移動できます。</p>
+        </section>
+
+        <aside class="panel rules-panel">
+          <p class="eyebrow">HOW TO PLAY</p><h2>遊び方</h2>
+          <ol><li><b>ヒントを出す</b><span>マスターは「単語＋枚数」で仲間に伝えます。</span></li><li><b>カードを選ぶ</b><span>エージェントは仲間の色を推理します。</span></li><li><b>先に全員発見</b><span>暗殺者を選ぶと、その場で敗北です。</span></li></ol>
+          <button id="open-editor" class="text-button hidden">カード候補ファイルを読み込む <span>↗</span></button>
+          <p id="word-count" class="word-count"></p>
+        </aside>
+      </div>
+
+      <div id="game" class="game-layout hidden">
+        <section class="game-main">
+          <div class="score-row"><div class="score red-score"><span>RED AGENTS</span><strong id="red-left">—</strong></div><div id="clue-display" class="clue-display"><small>CURRENT SIGNAL</small><strong>ヒント待ち</strong></div><div class="score blue-score"><span>BLUE AGENTS</span><strong id="blue-left">—</strong></div></div>
+          <div id="board" class="board" aria-label="ワードカード盤面"></div>
+        </section>
+        <aside class="action-panel panel">
+          <div><p class="eyebrow">YOUR ROLE</p><h2 id="my-role">—</h2><p id="role-guide" class="role-guide"></p></div>
+          <form id="clue-form" class="clue-form hidden"><label>1語のヒント</label><input id="clue-word" maxlength="20" placeholder="例：宇宙"><label>関連する枚数</label><input id="clue-count" type="number" min="1" max="9" value="2"><button class="primary-button">ヒントを送る</button></form>
+          <div id="guess-controls" class="hidden"><p class="guess-copy">相談して、カードを1枚選んでください。</p><button id="end-turn" class="secondary-button">ここでターン終了</button></div>
+          <div id="waiting-copy" class="waiting-copy">相手の行動を待っています…</div>
+          <button id="rematch" class="primary-button hidden">もう一度プレイ</button>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="word-editor">
+    <form method="dialog" class="editor-card">
+      <div class="editor-head"><div><p class="eyebrow">IMPORT DECK</p><h2>カードファイルを読み込む</h2></div><button class="icon-button close-button" value="cancel" aria-label="閉じる">×</button></div>
+      <p>UTF-8のTXT（1行1語）、CSV（先頭列）、またはJSON配列に対応しています。重複を除いて25〜300語必要です。</p>
+      <label class="file-drop" for="deck-file"><strong>ファイルを選択</strong><span>.txt / .csv / .json</span><input id="deck-file" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json"></label>
+      <div id="deck-preview" class="deck-preview empty">ファイルを選ぶと、ここに内容を確認表示します。</div>
+      <div class="editor-foot"><span id="editor-count">未選択</span><div><a class="sample-link" href="/card-sample.txt" download>見本ファイルを保存</a><button id="save-words" type="button" class="primary-button" disabled>このカードを使う</button></div></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
