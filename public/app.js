@@ -3,10 +3,29 @@ const $ = (selector) => document.querySelector(selector);
 const playerId = localStorage.playerId || (localStorage.playerId = crypto.randomUUID());
 let state = null;
 let importedDeck = null;
+let bgmEnabled = localStorage.bgmEnabled !== "false";
+let seEnabled = localStorage.seEnabled !== "false";
+let audioUnlocked = false;
+let currentBgm = null;
 let adminMode = false;
 let nextReminderAt = 0;
 let keepAliveTimer = null;
 const KEEP_ALIVE_REMINDER = 10 * 60 * 1000;
+
+const bgmTracks = {
+  lobby: Object.assign(new Audio("/audio/lobby.mp3"), { loop: true, preload: "auto", volume: 0.18 }),
+  battle: Object.assign(new Audio("/audio/battle.mp3"), { loop: true, preload: "auto", volume: 0.2 })
+};
+const seTracks = {
+  select: { src: "/audio/selectSE.mp3", volume: 0.28 },
+  turn: { src: "/audio/turn.mp3", volume: 0.48 },
+  hint: { src: "/audio/hint.mp3", volume: 0.5 },
+  team: { src: "/audio/teamcardSE.mp3", volume: 0.52 },
+  enemy: { src: "/audio/enemycardSE.mp3", volume: 0.52 },
+  neutral: { src: "/audio/neutralcard.mp3", volume: 0.5 },
+  assassin: { src: "/audio/badcard.mp3", volume: 0.58 }
+};
+for (const sound of Object.values(seTracks)) { const audio = new Audio(sound.src); audio.preload = "auto"; }
 
 const roleLabels = {
   "red-master": "レッド・マスター", "red-agent": "レッド・エージェント",
@@ -33,6 +52,13 @@ $("#copy-room").onclick = async () => { await navigator.clipboard.writeText(`${l
 $("#start-game").onclick = () => socket.emit("start-game");
 $("#end-turn").onclick = () => socket.emit("end-turn");
 $("#rematch").onclick = () => socket.emit("rematch");
+$("#toggle-bgm").onclick = () => {
+  bgmEnabled = !bgmEnabled; localStorage.bgmEnabled = bgmEnabled;
+  updateAudioControls();
+  if (bgmEnabled) playBgm(state?.game?.status === "playing" || state?.game?.status === "finished" ? "battle" : "lobby");
+  else stopBgm();
+};
+$("#toggle-se").onclick = () => { seEnabled = !seEnabled; localStorage.seEnabled = seEnabled; updateAudioControls(); };
 $("#admin-mode-button").onclick = enableAdminMode;
 $("#close-admin").onclick = disableAdminMode;
 $("#keep-alive-now").onclick = () => extendConnection(false);
@@ -54,6 +80,66 @@ $("#deck-file").onchange = importDeckFile;
 $("#save-words").onclick = () => {
   if (importedDeck) socket.emit("update-word-pool", importedDeck);
 };
+
+function updateAudioControls() {
+  $("#toggle-bgm").classList.toggle("muted", !bgmEnabled);
+  $("#toggle-bgm").setAttribute("aria-pressed", String(bgmEnabled));
+  $("#toggle-se").classList.toggle("muted", !seEnabled);
+  $("#toggle-se").setAttribute("aria-pressed", String(seEnabled));
+}
+
+function unlockAudio() {
+  audioUnlocked = true;
+  playBgm(state?.game?.status === "playing" || state?.game?.status === "finished" ? "battle" : "lobby");
+}
+
+function playBgm(type) {
+  if (!bgmEnabled || !audioUnlocked || currentBgm === type) return;
+  for (const [name, track] of Object.entries(bgmTracks)) {
+    if (name !== type) { track.pause(); track.currentTime = 0; }
+  }
+  currentBgm = type;
+  bgmTracks[type].play().catch(() => { currentBgm = null; });
+}
+
+function stopBgm() {
+  for (const track of Object.values(bgmTracks)) track.pause();
+  currentBgm = null;
+}
+
+function playSe(name) {
+  if (!seEnabled || !audioUnlocked || !seTracks[name]) return;
+  const audio = new Audio(seTracks[name].src);
+  audio.volume = seTracks[name].volume;
+  audio.play().catch(() => {});
+}
+
+function handleStateAudio(previous, next) {
+  const nextBgm = next.game.status === "playing" || next.game.status === "finished" ? "battle" : "lobby";
+  playBgm(nextBgm);
+  if (!previous?.game || previous.code !== next.code) return;
+  const before = previous.game;
+  const after = next.game;
+  if (before.status === "lobby" && after.status === "playing") {
+    setTimeout(() => playSe("turn"), 250);
+    return;
+  }
+  if (!before.clue && after.clue) playSe("hint");
+  const revealedIndex = after.cards?.findIndex((card, index) => card.revealed && !before.cards?.[index]?.revealed) ?? -1;
+  if (revealedIndex >= 0) {
+    const role = after.cards[revealedIndex].role;
+    const guessingTeam = after.history?.at(-1)?.team;
+    playSe(role === "assassin" ? "assassin" : role === "neutral" ? "neutral" : role === guessingTeam ? "team" : "enemy");
+  }
+  if (before.turn !== after.turn) setTimeout(() => playSe("turn"), revealedIndex >= 0 ? 650 : 0);
+}
+
+document.addEventListener("pointerdown", unlockAudio, { once: true, capture: true });
+document.addEventListener("keydown", unlockAudio, { once: true, capture: true });
+document.addEventListener("click", (event) => {
+  if (event.target.closest("button:not(:disabled)") && !event.target.closest(".word-card")) playSe("select");
+}, { capture: true });
+updateAudioControls();
 
 async function importDeckFile(event) {
   const file = event.target.files[0];
@@ -228,6 +314,7 @@ function render() {
 }
 
 socket.on("room-state", (next) => {
+  handleStateAudio(state, next);
   state = next; history.replaceState({}, "", `/?room=${next.code}`); render();
 });
 socket.on("game-error", toast);
