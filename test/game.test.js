@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createBoard, newGame, submitClue, guessCard, publicGame } = require("../game");
+const { createBoard, newGame, submitClue, markCard, guessCard, publicGame } = require("../game");
 
 test("board has 25 unique cards and correct role distribution", () => {
   const board = createBoard(() => 0.1);
@@ -37,6 +37,7 @@ test("history connects guesses to the active clue", () => {
   submitClue(game, team, "自然", 2);
   const matchingIndex = game.cards.findIndex((card) => card.role === team);
   const selected = game.cards[matchingIndex];
+  markCard(game, team, matchingIndex);
   guessCard(game, team, matchingIndex);
   assert.deepEqual(game.history[0].guesses, [{ word: selected.word, role: team }]);
   assert.equal(game.history[0].ended, false);
@@ -46,9 +47,24 @@ test("assassin ends game for opposite team", () => {
   const game = newGame(() => 0.1);
   const team = game.turn;
   submitClue(game, team, "危険", 1);
-  guessCard(game, team, game.cards.findIndex((c) => c.role === "assassin"));
+  const assassinIndex = game.cards.findIndex((c) => c.role === "assassin");
+  markCard(game, team, assassinIndex);
+  guessCard(game, team, assassinIndex);
   assert.equal(game.status, "finished");
   assert.notEqual(game.winner, team);
+});
+
+test("a card must be marked before it can be revealed", () => {
+  const game = newGame(() => 0.1);
+  const team = game.turn;
+  submitClue(game, team, "確認", 1);
+  const index = game.cards.findIndex((card) => card.role === team);
+  assert.throws(() => guessCard(game, team, index), /マーク/);
+  markCard(game, team, index);
+  assert.equal(game.markedCard, index);
+  guessCard(game, team, index);
+  assert.equal(game.cards[index].revealed, true);
+  assert.equal(game.markedCard, null);
 });
 
 test("field agents cannot see unrevealed key", () => {

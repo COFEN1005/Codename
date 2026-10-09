@@ -52,6 +52,7 @@ $("#copy-room").onclick = async () => { await navigator.clipboard.writeText(`${l
 $("#start-game").onclick = () => socket.emit("start-game");
 $("#end-turn").onclick = () => socket.emit("end-turn");
 $("#rematch").onclick = () => socket.emit("rematch");
+$("#end-game").onclick = () => { if (confirm("このゲームを終了しますか？")) socket.emit("end-game"); };
 $("#toggle-bgm").onclick = () => {
   bgmEnabled = !bgmEnabled; localStorage.bgmEnabled = bgmEnabled;
   updateAudioControls();
@@ -137,7 +138,7 @@ function handleStateAudio(previous, next) {
 document.addEventListener("pointerdown", unlockAudio, { once: true, capture: true });
 document.addEventListener("keydown", unlockAudio, { once: true, capture: true });
 document.addEventListener("click", (event) => {
-  if (event.target.closest("button:not(:disabled)") && !event.target.closest(".word-card")) playSe("select");
+  if (event.target.closest("button:not(:disabled)")) playSe("select");
 }, { capture: true });
 updateAudioControls();
 
@@ -270,14 +271,16 @@ function renderGame() {
   setHidden("#guess-controls", !(myAction && !isMaster));
   setHidden("#waiting-copy", myAction || game.status === "finished");
   setHidden("#rematch", game.status !== "finished");
+  setHidden("#owner-game-controls", !(state.isOwner && game.status === "playing"));
 
   const board = $("#board"); board.innerHTML = "";
   game.cards.forEach((card, index) => {
     const button = document.createElement("button");
-    button.className = `word-card ${card.role || "unknown"} ${card.revealed ? "revealed" : ""}`;
-    button.innerHTML = `<span>${escapeHtml(card.word)}</span>${card.role && !card.revealed ? `<i>${roleMark(card.role)}</i>` : ""}`;
+    const marked = game.markedCard === index;
+    button.className = `word-card ${card.role || "unknown"} ${card.revealed ? "revealed" : ""} ${marked ? `marked marked-${game.turn}` : ""}`;
+    button.innerHTML = `<span>${escapeHtml(card.word)}</span>${card.role && !card.revealed ? `<i class="role-key">${roleMark(card.role)}</i>` : ""}${marked ? `<span class="card-marker" title="このカードを開く"><b>✓</b><small>OPEN</small></span>` : ""}`;
     button.disabled = card.revealed || !(myAction && !isMaster);
-    button.onclick = () => socket.emit("guess-card", index);
+    button.onclick = (event) => socket.emit(event.target.closest(".card-marker") ? "guess-card" : "mark-card", index);
     board.appendChild(button);
   });
   renderGameLog(game.history || []);

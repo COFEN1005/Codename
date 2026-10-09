@@ -3,7 +3,7 @@ const http = require("node:http");
 const crypto = require("node:crypto");
 const express = require("express");
 const { Server } = require("socket.io");
-const { WORDS, newGame, submitClue, guessCard, endTurn, publicGame } = require("./game");
+const { WORDS, newGame, submitClue, markCard, guessCard, endTurn, publicGame } = require("./game");
 
 const app = express();
 const server = http.createServer(app);
@@ -150,6 +150,13 @@ io.on("connection", (socket) => {
     catch (err) { error(socket, err.message); }
   });
 
+  socket.on("mark-card", (index) => {
+    const { room, player } = getPlayer(socket);
+    if (!room || !player || player.seat !== `${room.game.turn}-agent`) return error(socket, "あなたの回答番ではありません。");
+    try { markCard(room.game, room.game.turn, Number(index)); broadcast(room); }
+    catch (err) { error(socket, err.message); }
+  });
+
   socket.on("end-turn", () => {
     const { room, player } = getPlayer(socket);
     if (!room || !player || room.game.phase !== "guess" || player.seat !== `${room.game.turn}-agent`) return error(socket, "今はターンを終了できません。");
@@ -161,6 +168,20 @@ io.on("connection", (socket) => {
     const { room } = getPlayer(socket);
     if (!room || room.game.status !== "finished") return;
     room.game = newGame(Math.random, room.wordPool);
+    broadcast(room);
+  });
+
+  socket.on("end-game", () => {
+    const { room, player } = getPlayer(socket);
+    if (!room || !player || player.id !== room.ownerId) return error(socket, "ゲームを終了できるのはルーム作成者だけです。");
+    if (room.game.status !== "playing") return error(socket, "進行中のゲームがありません。");
+    const currentLog = room.game.history?.at(-1);
+    if (currentLog) currentLog.ended = true;
+    room.game.status = "finished";
+    room.game.phase = "finished";
+    room.game.markedCard = null;
+    room.game.winner = null;
+    room.game.message = "ルーム作成者がゲームを終了しました。";
     broadcast(room);
   });
 

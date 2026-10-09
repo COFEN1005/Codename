@@ -47,6 +47,7 @@ function newGame(random = Math.random, wordPool = WORDS) {
     phase: "clue",
     clue: null,
     guessesLeft: 0,
+    markedCard: null,
     history: [],
     winner: null,
     message: `${teamName(board.startingTeam)}のスパイマスターがヒントを出してください。`
@@ -75,6 +76,7 @@ function submitClue(game, team, word, count) {
     throw new Error("盤面と同じ単語はヒントに使えません。");
   }
   game.clue = { word: cleanWord, count: cleanCount };
+  game.markedCard = null;
   game.history.push({
     team,
     clue: { word: cleanWord, count: cleanCount },
@@ -93,7 +95,17 @@ function endTurn(game) {
   game.phase = "clue";
   game.clue = null;
   game.guessesLeft = 0;
+  game.markedCard = null;
   game.message = `${teamName(game.turn)}のスパイマスターがヒントを出してください。`;
+}
+
+function markCard(game, team, index) {
+  if (game.status !== "playing" || game.phase !== "guess" || game.turn !== team) {
+    throw new Error("今はカードにマークできません。");
+  }
+  const card = game.cards[index];
+  if (!card || card.revealed) throw new Error("そのカードにはマークできません。");
+  game.markedCard = game.markedCard === index ? null : index;
 }
 
 function guessCard(game, team, index) {
@@ -102,7 +114,9 @@ function guessCard(game, team, index) {
   }
   const card = game.cards[index];
   if (!card || card.revealed) throw new Error("そのカードは選べません。");
+  if (game.markedCard !== index) throw new Error("先にカードへマークしてください。");
   card.revealed = true;
+  game.markedCard = null;
   const currentLog = game.history?.at(-1);
   if (currentLog) currentLog.guesses.push({ word: card.word, role: card.role });
   game.guessesLeft -= 1;
@@ -146,4 +160,4 @@ function publicGame(game, viewerRole) {
   };
 }
 
-module.exports = { WORDS, createBoard, newGame, submitClue, guessCard, endTurn, publicGame, remaining };
+module.exports = { WORDS, createBoard, newGame, submitClue, markCard, guessCard, endTurn, publicGame, remaining };
