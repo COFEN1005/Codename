@@ -30,7 +30,8 @@ const seTracks = {
   team: { src: "/audio/teamcardSE.mp3", gain: 0.9 },
   enemy: { src: "/audio/enemycardSE.mp3", gain: 0.9 },
   neutral: { src: "/audio/neutralcard.mp3", gain: 0.85 },
-  assassin: { src: "/audio/badcard.mp3", gain: 1 }
+  assassin: { src: "/audio/badcard.mp3", gain: 1 },
+  end: { src: "/audio/end.mp3", gain: 0.9 }
 };
 for (const sound of Object.values(seTracks)) { const audio = new Audio(sound.src); audio.preload = "auto"; }
 applyBgmVolume();
@@ -113,6 +114,7 @@ $("#end-turn").onclick = () => socket.emit("end-turn");
 $("#rematch").onclick = () => socket.emit("rematch");
 $("#return-lobby").onclick = () => socket.emit("return-to-lobby");
 $("#end-game").onclick = () => { if (confirm("このゲームを終了しますか？")) socket.emit("end-game"); };
+$("#close-result").onclick = () => setHidden("#result-popup", true);
 $("#toggle-bgm").onclick = () => {
   bgmEnabled = !bgmEnabled; localStorage.bgmEnabled = bgmEnabled;
   updateAudioControls();
@@ -229,18 +231,35 @@ function handleStateAudio(previous, next) {
   if (!previous?.game || previous.code !== next.code) return;
   const before = previous.game;
   const after = next.game;
+  const resultDecided = before.status === "playing" && after.status === "finished" && Boolean(after.winner);
   if (before.status === "lobby" && after.status === "playing") {
     setTimeout(() => playSe("turn"), 250);
     return;
   }
   if (!before.clue && after.clue) playSe("hint");
   const revealedIndex = after.cards?.findIndex((card, index) => card.revealed && !before.cards?.[index]?.revealed) ?? -1;
-  if (revealedIndex >= 0) {
+  if (resultDecided) {
+    playSe("end");
+  } else if (revealedIndex >= 0) {
     const role = after.cards[revealedIndex].role;
     const guessingTeam = after.history?.at(-1)?.team;
     playSe(role === "assassin" ? "assassin" : role === "neutral" ? "neutral" : role === guessingTeam ? "team" : "enemy");
   }
-  if (before.turn !== after.turn) setTimeout(() => playSe("turn"), revealedIndex >= 0 ? 650 : 0);
+  if (!resultDecided && before.turn !== after.turn) setTimeout(() => playSe("turn"), revealedIndex >= 0 ? 650 : 0);
+}
+
+function handleStateResult(previous, next) {
+  if (next.game.status !== "finished" || !next.game.winner || previous?.game?.status === "finished") return;
+  const myTeam = next.me?.seat?.startsWith("red") ? "red" : "blue";
+  const won = myTeam === next.game.winner;
+  const winnerLabel = next.game.winner === "red" ? "レッド" : "ブルー";
+  const popup = $("#result-popup");
+  const card = popup.querySelector(".result-card");
+  card.className = `result-card ${won ? "result-win" : "result-lose"} result-${next.game.winner}`;
+  $("#result-kicker").textContent = won ? "MISSION COMPLETE" : "MISSION FAILED";
+  $("#result-title").textContent = won ? "勝利" : "敗北";
+  $("#result-copy").textContent = `${winnerLabel}チームの勝利です。`;
+  setHidden("#result-popup", false);
 }
 
 function handleStateVisual(previous, next) {
@@ -470,6 +489,7 @@ function render() {
   setHidden("#admin-mode-button", !state.isOwner);
   if (!state.isOwner && adminMode) disableAdminMode();
   const inLobby = state.game.status === "lobby";
+  if (state.game.status !== "finished") setHidden("#result-popup", true);
   setHidden("#lobby", !inLobby); setHidden("#game", inLobby); setHidden("#turn-chip", inLobby);
   if (inLobby) renderLobby(); else renderGame();
 }
@@ -478,7 +498,10 @@ socket.on("room-state", (next) => {
   const previous = state;
   handleStateAudio(previous, next);
   state = next; history.replaceState({}, "", `/?room=${next.code}`); render();
-  requestAnimationFrame(() => handleStateVisual(previous, next));
+  requestAnimationFrame(() => {
+    handleStateVisual(previous, next);
+    handleStateResult(previous, next);
+  });
 });
 socket.on("game-error", toast);
 socket.on("word-pool-saved", (message) => { toast(message); $("#word-editor").close(); });
