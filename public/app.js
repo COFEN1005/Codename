@@ -5,6 +5,8 @@ let state = null;
 let importedDeck = null;
 let bgmEnabled = localStorage.bgmEnabled !== "false";
 let seEnabled = localStorage.seEnabled !== "false";
+let bgmVolume = storedVolume("bgmVolume", 0.14);
+let seVolume = storedVolume("seVolume", 0.22);
 let audioUnlocked = false;
 let currentBgm = null;
 let adminMode = false;
@@ -13,19 +15,29 @@ let keepAliveTimer = null;
 const KEEP_ALIVE_REMINDER = 10 * 60 * 1000;
 
 const bgmTracks = {
-  lobby: Object.assign(new Audio("/audio/lobby.mp3"), { loop: true, preload: "auto", volume: 0.18 }),
-  battle: Object.assign(new Audio("/audio/battle.mp3"), { loop: true, preload: "auto", volume: 0.2 })
+  lobby: Object.assign(new Audio("/audio/lobby.mp3"), { loop: true, preload: "auto", gain: 0.9 }),
+  battle: Object.assign(new Audio("/audio/battle.mp3"), { loop: true, preload: "auto", gain: 1 })
 };
 const seTracks = {
-  select: { src: "/audio/selectSE.mp3", volume: 0.28 },
-  turn: { src: "/audio/turn.mp3", volume: 0.48 },
-  hint: { src: "/audio/hint.mp3", volume: 0.5 },
-  team: { src: "/audio/teamcardSE.mp3", volume: 0.52 },
-  enemy: { src: "/audio/enemycardSE.mp3", volume: 0.52 },
-  neutral: { src: "/audio/neutralcard.mp3", volume: 0.5 },
-  assassin: { src: "/audio/badcard.mp3", volume: 0.58 }
+  select: { src: "/audio/selectSE.mp3", gain: 0.65 },
+  turn: { src: "/audio/turn.mp3", gain: 0.85 },
+  hint: { src: "/audio/hint.mp3", gain: 0.85 },
+  team: { src: "/audio/teamcardSE.mp3", gain: 0.9 },
+  enemy: { src: "/audio/enemycardSE.mp3", gain: 0.9 },
+  neutral: { src: "/audio/neutralcard.mp3", gain: 0.85 },
+  assassin: { src: "/audio/badcard.mp3", gain: 1 }
 };
 for (const sound of Object.values(seTracks)) { const audio = new Audio(sound.src); audio.preload = "auto"; }
+applyBgmVolume();
+
+function storedVolume(key, fallback) {
+  const value = Number.parseFloat(localStorage.getItem(key));
+  return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback;
+}
+
+function applyBgmVolume() {
+  for (const track of Object.values(bgmTracks)) track.volume = bgmVolume * track.gain;
+}
 
 const roleLabels = {
   "red-master": "レッド・マスター", "red-agent": "レッド・エージェント",
@@ -60,6 +72,30 @@ $("#toggle-bgm").onclick = () => {
   else stopBgm();
 };
 $("#toggle-se").onclick = () => { seEnabled = !seEnabled; localStorage.seEnabled = seEnabled; updateAudioControls(); };
+$("#open-audio-settings").onclick = (event) => {
+  event.stopPropagation();
+  const panel = $("#audio-settings");
+  const opening = panel.classList.contains("hidden");
+  panel.classList.toggle("hidden", !opening);
+  $("#open-audio-settings").setAttribute("aria-expanded", String(opening));
+};
+$("#audio-settings").onclick = (event) => event.stopPropagation();
+$("#bgm-volume").oninput = (event) => {
+  bgmVolume = Number(event.target.value) / 100;
+  localStorage.setItem("bgmVolume", String(bgmVolume));
+  applyBgmVolume();
+  updateAudioControls();
+};
+$("#se-volume").oninput = (event) => {
+  seVolume = Number(event.target.value) / 100;
+  localStorage.setItem("seVolume", String(seVolume));
+  updateAudioControls();
+};
+$("#se-volume").onchange = () => playSe("select");
+document.addEventListener("click", () => {
+  $("#audio-settings").classList.add("hidden");
+  $("#open-audio-settings").setAttribute("aria-expanded", "false");
+});
 $("#admin-mode-button").onclick = enableAdminMode;
 $("#close-admin").onclick = disableAdminMode;
 $("#keep-alive-now").onclick = () => extendConnection(false);
@@ -87,6 +123,10 @@ function updateAudioControls() {
   $("#toggle-bgm").setAttribute("aria-pressed", String(bgmEnabled));
   $("#toggle-se").classList.toggle("muted", !seEnabled);
   $("#toggle-se").setAttribute("aria-pressed", String(seEnabled));
+  $("#bgm-volume").value = String(Math.round(bgmVolume * 100));
+  $("#bgm-volume-value").value = `${Math.round(bgmVolume * 100)}%`;
+  $("#se-volume").value = String(Math.round(seVolume * 100));
+  $("#se-volume-value").value = `${Math.round(seVolume * 100)}%`;
 }
 
 function unlockAudio() {
@@ -111,7 +151,7 @@ function stopBgm() {
 function playSe(name) {
   if (!seEnabled || !audioUnlocked || !seTracks[name]) return;
   const audio = new Audio(seTracks[name].src);
-  audio.volume = seTracks[name].volume;
+  audio.volume = seVolume * seTracks[name].gain;
   audio.play().catch(() => {});
 }
 

@@ -18,6 +18,15 @@
       <div class="audio-controls" aria-label="音量設定">
         <button id="toggle-bgm" class="audio-toggle" title="BGMのオン・オフ"><span>♫</span><b>BGM</b></button>
         <button id="toggle-se" class="audio-toggle" title="効果音のオン・オフ"><span>⌁</span><b>SE</b></button>
+        <button id="open-audio-settings" class="audio-settings-button" title="音量を調整" aria-expanded="false" aria-controls="audio-settings">⚙</button>
+        <div id="audio-settings" class="audio-settings-panel hidden">
+          <div class="audio-settings-head"><strong>音量設定</strong><small>端末に保存されます</small></div>
+          <label for="bgm-volume"><span>BGM</span><output id="bgm-volume-value">14%</output></label>
+          <input id="bgm-volume" type="range" min="0" max="100" step="1" value="14">
+          <label for="se-volume"><span>SE</span><output id="se-volume-value">22%</output></label>
+          <input id="se-volume" type="range" min="0" max="100" step="1" value="22">
+          <p>初期音量は耳にやさしい小さめの設定です。</p>
+        </div>
       </div>
       <button id="admin-mode-button" class="admin-mode-button hidden"><span class="admin-shield">A</span> 管理者モード</button>
       <div id="room-badge" class="room-badge hidden"><span>ROOM</span><strong id="room-code"></strong><button id="copy-room" class="icon-button" title="招待リンクをコピー">⧉</button></div>
