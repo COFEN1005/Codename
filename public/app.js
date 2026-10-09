@@ -111,7 +111,7 @@ $("#copy-room").onclick = async () => { await navigator.clipboard.writeText(`${l
 $("#start-game").onclick = () => socket.emit("start-game");
 $("#end-turn").onclick = () => socket.emit("end-turn");
 $("#rematch").onclick = () => socket.emit("rematch");
-$("#end-game").onclick = () => { if (confirm("このゲームを終了しますか？")) socket.emit("end-game"); };
+$("#end-game").onclick = () => { if (confirm("このゲームを終了して、カードファイルを選ぶ画面へ戻りますか？")) socket.emit("end-game"); };
 $("#toggle-bgm").onclick = () => {
   bgmEnabled = !bgmEnabled; localStorage.bgmEnabled = bgmEnabled;
   updateAudioControls();
@@ -387,6 +387,7 @@ async function extendConnection(fromReminder) {
 
 function renderLobby() {
   const occupied = state.players.filter((p) => p.name).length;
+  $("#game-message").textContent = occupied === 4 ? "カードを選んでゲームを開始できます" : "プレイヤーを待っています";
   $("#player-count").textContent = `${occupied} / 4`;
   $("#start-game").disabled = occupied !== 4;
   $("#start-game").innerHTML = occupied === 4 ? "ゲーム開始 <span>→</span>" : "4人そろったらゲーム開始 <span>→</span>";

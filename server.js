@@ -175,13 +175,7 @@ io.on("connection", (socket) => {
     const { room, player } = getPlayer(socket);
     if (!room || !player || player.id !== room.ownerId) return error(socket, "ゲームを終了できるのはルーム作成者だけです。");
     if (room.game.status !== "playing") return error(socket, "進行中のゲームがありません。");
-    const currentLog = room.game.history?.at(-1);
-    if (currentLog) currentLog.ended = true;
-    room.game.status = "finished";
-    room.game.phase = "finished";
-    room.game.markedCard = null;
-    room.game.winner = null;
-    room.game.message = "ルーム作成者がゲームを終了しました。";
+    room.game = { status: "lobby", cards: [] };
     broadcast(room);
   });
 
