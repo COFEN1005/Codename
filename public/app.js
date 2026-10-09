@@ -285,26 +285,37 @@ document.addEventListener("click", (event) => {
 updateAudioControls();
 
 async function importDeckFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+  const files = [...event.target.files];
+  if (!files.length) return;
   try {
-    const text = await file.text();
-    let words;
-    if (file.name.toLowerCase().endsWith(".json")) {
-      const data = JSON.parse(text);
-      words = Array.isArray(data) ? data : data.words;
-      if (!Array.isArray(words)) throw new Error("JSONは文字列の配列、または words 配列にしてください。");
-    } else if (file.name.toLowerCase().endsWith(".csv")) {
-      words = text.split(/\r?\n/).map((line) => line.split(",")[0].replace(/^\s*[\"']|[\"']\s*$/g, ""));
-    } else {
-      words = text.split(/\r?\n/);
-    }
-    words = [...new Set(words.map((word) => String(word).trim()).filter((word) => word && !word.startsWith("#")))];
-    if (words.length < 25 || words.length > 300) throw new Error(`重複を除いて25〜300語必要です（現在${words.length}語）。`);
-    importedDeck = { name: file.name, words };
+    const lists = await Promise.all(files.map(async (file) => {
+      try {
+        const text = await file.text();
+        if (file.name.toLowerCase().endsWith(".json")) {
+          const data = JSON.parse(text);
+          const words = Array.isArray(data) ? data : data.words;
+          if (!Array.isArray(words)) throw new Error("文字列の配列、または words 配列ではありません");
+          return words;
+        }
+        if (file.name.toLowerCase().endsWith(".csv")) {
+          return text.split(/\r?\n/).map((line) => line.split(",")[0].replace(/^\s*[\"']|[\"']\s*$/g, ""));
+        }
+        return text.split(/\r?\n/);
+      } catch (error) {
+        throw new Error(`${file.name}: ${error.message}`);
+      }
+    }));
+    const words = [...new Set(lists.flat()
+      .map((word) => String(word).trim())
+      .filter((word) => word && !word.startsWith("#"))
+      .map((word) => word.replace(/\s+/g, " ").slice(0, 20))
+      .filter(Boolean))];
+    if (words.length < 25 || words.length > 5_000) throw new Error(`重複を除いて合計25〜5,000語必要です（現在${words.length.toLocaleString("ja-JP")}語）。`);
+    const deckName = files.length === 1 ? files[0].name : `${files.length}ファイル統合`;
+    importedDeck = { name: deckName, words };
     $("#deck-preview").classList.remove("empty");
-    $("#deck-preview").innerHTML = words.slice(0, 40).map((word) => `<span>${escapeHtml(word)}</span>`).join("") + (words.length > 40 ? `<i>ほか ${words.length - 40}語</i>` : "");
-    $("#editor-count").textContent = `${file.name} · ${words.length}語`;
+    $("#deck-preview").innerHTML = words.slice(0, 40).map((word) => `<span>${escapeHtml(word)}</span>`).join("") + (words.length > 40 ? `<i>ほか ${(words.length - 40).toLocaleString("ja-JP")}語</i>` : "");
+    $("#editor-count").textContent = `${files.length}ファイル · ${words.length.toLocaleString("ja-JP")}語`;
     $("#save-words").disabled = false;
   } catch (error) {
     importedDeck = null; $("#save-words").disabled = true;

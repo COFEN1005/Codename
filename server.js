@@ -7,10 +7,11 @@ const { WORDS, newGame, submitClue, markCard, guessCard, endTurn, publicGame } =
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 100_000 });
+const io = new Server(server, { maxHttpBufferSize: 1_000_000 });
 const rooms = new Map();
 const PORT = process.env.PORT || 3000;
 const SEATS = ["red-master", "red-agent", "blue-master", "blue-agent"];
+const MAX_WORD_POOL = 5_000;
 
 app.disable("x-powered-by");
 app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -39,7 +40,6 @@ function serializeRoom(room, player) {
   return {
     code: room.code,
     isOwner: player?.id === room.ownerId,
-    wordPool: player?.id === room.ownerId && room.game.status === "lobby" ? room.wordPool : undefined,
     wordCount: room.wordPool.length,
     deckName: room.deckName,
     me: player ? { id: player.id, name: player.name, seat: player.seat } : null,
@@ -120,7 +120,7 @@ io.on("connection", (socket) => {
     if (!Array.isArray(words)) return error(socket, "カード候補の形式が正しくありません。");
     const cleaned = [...new Set(words.map((word) => String(word).trim().replace(/\s+/g, " ").slice(0, 20)).filter(Boolean))];
     if (cleaned.length < 25) return error(socket, "重複しないカード候補を25語以上入力してください。");
-    if (cleaned.length > 300) return error(socket, "カード候補は300語までです。");
+    if (cleaned.length > MAX_WORD_POOL) return error(socket, `カード候補は合計${MAX_WORD_POOL.toLocaleString("ja-JP")}語までです。`);
     room.wordPool = cleaned;
     room.deckName = String(payload?.name || "読み込みカード").trim().slice(0, 60);
     broadcast(room);

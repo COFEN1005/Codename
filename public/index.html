@@ -121,8 +121,8 @@
   <dialog id="word-editor">
     <form method="dialog" class="editor-card">
       <div class="editor-head"><div><p class="eyebrow">IMPORT DECK</p><h2>カードファイルを読み込む</h2></div><button class="icon-button close-button" value="cancel" aria-label="閉じる">×</button></div>
-      <p>UTF-8のTXT（1行1語）、CSV（先頭列）、またはJSON配列に対応しています。重複を除いて25〜300語必要です。</p>
-      <label class="file-drop" for="deck-file"><strong>ファイルを選択</strong><span>.txt / .csv / .json</span><input id="deck-file" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json"></label>
+      <p>UTF-8のTXT（1行1語）、CSV（先頭列）、またはJSON配列に対応しています。複数ファイルを統合でき、重複を除いて合計25〜5,000語必要です。</p>
+      <label class="file-drop" for="deck-file"><strong>ファイルを選択</strong><span>.txt / .csv / .json · 複数選択可</span><input id="deck-file" type="file" multiple accept=".txt,.csv,.json,text/plain,text/csv,application/json"></label>
       <div id="deck-preview" class="deck-preview empty">ファイルを選ぶと、ここに内容を確認表示します。</div>
       <div class="editor-foot"><span id="editor-count">未選択</span><div><a class="sample-link" href="/card-sample.txt" download>見本ファイルを保存</a><button id="save-words" type="button" class="primary-button" disabled>このカードを使う</button></div></div>
     </form>

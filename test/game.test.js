@@ -13,9 +13,10 @@ test("board has 25 unique cards and correct role distribution", () => {
 });
 
 test("custom word pool is used", () => {
-  const words = Array.from({ length: 30 }, (_, i) => `custom-${i}`);
+  const words = Array.from({ length: 1_000 }, (_, i) => `custom-${i}`);
   const board = createBoard(() => 0.2, words);
   assert.ok(board.cards.every((card) => card.word.startsWith("custom-")));
+  assert.equal(board.cards.length, 25);
 });
 
 test("clue allows count plus one guesses", () => {
