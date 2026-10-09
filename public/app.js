@@ -135,6 +135,41 @@ function handleStateAudio(previous, next) {
   if (before.turn !== after.turn) setTimeout(() => playSe("turn"), revealedIndex >= 0 ? 650 : 0);
 }
 
+function handleStateVisual(previous, next) {
+  if (!previous?.game?.cards || previous.code !== next.code) return;
+  const revealedIndex = next.game.cards?.findIndex((card, index) => card.revealed && !previous.game.cards[index]?.revealed) ?? -1;
+  if (revealedIndex < 0) return;
+  const card = $("#board")?.children[revealedIndex];
+  if (!card) return;
+  card.classList.add("just-revealed");
+  const role = next.game.cards[revealedIndex].role;
+  const guessingTeam = next.game.history?.at(-1)?.team;
+  if (role === guessingTeam) {
+    card.classList.add("successful-reveal");
+    const burst = document.createElement("span");
+    burst.className = "success-burst";
+    for (let i = 0; i < 14; i += 1) {
+      const particle = document.createElement("i");
+      const angle = (Math.PI * 2 * i) / 14;
+      const distance = 42 + (i % 3) * 12;
+      particle.style.setProperty("--x", `${Math.cos(angle) * distance}px`);
+      particle.style.setProperty("--y", `${Math.sin(angle) * distance}px`);
+      particle.style.setProperty("--delay", `${(i % 4) * 25}ms`);
+      burst.appendChild(particle);
+    }
+    const label = document.createElement("span");
+    label.className = "success-label";
+    label.textContent = "SUCCESS";
+    card.append(burst, label);
+    $("#board").classList.add(`success-pulse-${role}`);
+    setTimeout(() => $("#board")?.classList.remove(`success-pulse-${role}`), 900);
+  }
+  setTimeout(() => {
+    card.classList.remove("just-revealed", "successful-reveal");
+    card.querySelectorAll(".success-burst,.success-label").forEach((node) => node.remove());
+  }, 1300);
+}
+
 document.addEventListener("pointerdown", unlockAudio, { once: true, capture: true });
 document.addEventListener("keydown", unlockAudio, { once: true, capture: true });
 document.addEventListener("click", (event) => {
@@ -317,8 +352,10 @@ function render() {
 }
 
 socket.on("room-state", (next) => {
-  handleStateAudio(state, next);
+  const previous = state;
+  handleStateAudio(previous, next);
   state = next; history.replaceState({}, "", `/?room=${next.code}`); render();
+  requestAnimationFrame(() => handleStateVisual(previous, next));
 });
 socket.on("game-error", toast);
 socket.on("word-pool-saved", (message) => { toast(message); $("#word-editor").close(); });
