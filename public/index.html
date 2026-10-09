@@ -14,7 +14,10 @@
   <div class="noise"></div>
   <header class="topbar">
     <a class="brand" href="/" aria-label="ホーム"><span class="brand-mark">S</span><span>SIGNAL<br>WORDS</span></a>
-    <div id="room-badge" class="room-badge hidden"><span>ROOM</span><strong id="room-code"></strong><button id="copy-room" class="icon-button" title="招待リンクをコピー">⧉</button></div>
+    <div class="top-actions">
+      <button id="admin-mode-button" class="admin-mode-button hidden"><span class="admin-shield">A</span> 管理者モード</button>
+      <div id="room-badge" class="room-badge hidden"><span>ROOM</span><strong id="room-code"></strong><button id="copy-room" class="icon-button" title="招待リンクをコピー">⧉</button></div>
+    </div>
   </header>
 
   <main>
@@ -78,6 +81,14 @@
       </div>
     </section>
   </main>
+
+  <aside id="admin-console" class="admin-console hidden" aria-label="管理者コンソール">
+    <div class="admin-console-head"><div><span class="admin-live-dot"></span><small>ADMIN MODE</small><strong>接続管理</strong></div><button id="close-admin" class="icon-button" title="管理者モードを終了">×</button></div>
+    <p>この画面を開いている間、10分ごとにRenderへの接続を自動延長します。</p>
+    <div class="keep-alive-status"><span>次回の自動延長</span><strong id="keep-alive-countdown">10:00</strong></div>
+    <button id="keep-alive-now" class="keep-alive-button"><span>↻</span><span><b>今すぐ接続延長</b><small id="last-keep-alive">まだ延長していません</small></span></button>
+    <label class="notification-row"><input id="admin-notifications" type="checkbox" checked><span>自動延長時に通知する</span></label>
+  </aside>
 
   <dialog id="word-editor">
     <form method="dialog" class="editor-card">

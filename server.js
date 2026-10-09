@@ -14,6 +14,10 @@ const SEATS = ["red-master", "red-agent", "blue-master", "blue-agent"];
 
 app.disable("x-powered-by");
 app.get("/health", (_req, res) => res.json({ ok: true }));
+app.post("/keep-alive", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ ok: true, extendedAt: new Date().toISOString() });
+});
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/*splat", (_req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 

@@ -3,6 +3,10 @@ const $ = (selector) => document.querySelector(selector);
 const playerId = localStorage.playerId || (localStorage.playerId = crypto.randomUUID());
 let state = null;
 let importedDeck = null;
+let adminMode = false;
+let nextKeepAliveAt = 0;
+let keepAliveTimer = null;
+const KEEP_ALIVE_INTERVAL = 10 * 60 * 1000;
 
 const roleLabels = {
   "red-master": "レッド・マスター", "red-agent": "レッド・エージェント",
@@ -29,6 +33,9 @@ $("#copy-room").onclick = async () => { await navigator.clipboard.writeText(`${l
 $("#start-game").onclick = () => socket.emit("start-game");
 $("#end-turn").onclick = () => socket.emit("end-turn");
 $("#rematch").onclick = () => socket.emit("rematch");
+$("#admin-mode-button").onclick = enableAdminMode;
+$("#close-admin").onclick = disableAdminMode;
+$("#keep-alive-now").onclick = () => extendConnection(false);
 
 $("#clue-form").onsubmit = (event) => {
   event.preventDefault();
@@ -72,6 +79,67 @@ async function importDeckFile(event) {
 }
 
 function setHidden(selector, hidden) { $(selector).classList.toggle("hidden", hidden); }
+
+async function enableAdminMode() {
+  if (!state?.isOwner) return;
+  adminMode = true;
+  document.body.classList.add("admin-active");
+  setHidden("#admin-console", false);
+  $("#admin-mode-button").classList.add("active");
+  $("#admin-mode-button").lastChild.textContent = " 管理者モード ON";
+  nextKeepAliveAt = Date.now() + KEEP_ALIVE_INTERVAL;
+  updateKeepAliveCountdown();
+  clearInterval(keepAliveTimer);
+  keepAliveTimer = setInterval(updateKeepAliveCountdown, 1000);
+  if ($("#admin-notifications").checked && "Notification" in window && Notification.permission === "default") {
+    await Notification.requestPermission();
+  }
+  toast("管理者モードを起動しました");
+}
+
+function disableAdminMode() {
+  adminMode = false;
+  document.body.classList.remove("admin-active");
+  setHidden("#admin-console", true);
+  $("#admin-mode-button").classList.remove("active");
+  $("#admin-mode-button").lastChild.textContent = " 管理者モード";
+  clearInterval(keepAliveTimer);
+  keepAliveTimer = null;
+}
+
+function updateKeepAliveCountdown() {
+  if (!adminMode || !state?.isOwner) return;
+  const left = Math.max(0, nextKeepAliveAt - Date.now());
+  const minutes = Math.floor(left / 60000);
+  const seconds = Math.floor((left % 60000) / 1000);
+  $("#keep-alive-countdown").textContent = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  if (left === 0) extendConnection(true);
+}
+
+async function extendConnection(automatic) {
+  if (!state?.isOwner || !adminMode) return;
+  const button = $("#keep-alive-now");
+  button.disabled = true;
+  try {
+    const response = await fetch("/keep-alive", { method: "POST", cache: "no-store" });
+    if (!response.ok) throw new Error("接続延長に失敗しました");
+    const result = await response.json();
+    const time = new Date(result.extendedAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+    $("#last-keep-alive").textContent = `${time} に延長済み`;
+    nextKeepAliveAt = Date.now() + KEEP_ALIVE_INTERVAL;
+    updateKeepAliveCountdown();
+    const message = automatic ? "接続を自動延長しました。次回は10分後です。" : "接続を延長しました。次回は10分後です。";
+    toast(message);
+    if (automatic && $("#admin-notifications").checked && "Notification" in window && Notification.permission === "granted") {
+      new Notification("SIGNAL WORDS", { body: message, tag: "signal-words-keep-alive" });
+    }
+  } catch (error) {
+    toast(error.message);
+    nextKeepAliveAt = Date.now() + 60_000;
+  } finally {
+    button.disabled = false;
+  }
+}
 
 function renderLobby() {
   const occupied = state.players.filter((p) => p.name).length;
@@ -130,6 +198,8 @@ function escapeHtml(text) { const div = document.createElement("div"); div.textC
 function render() {
   setHidden("#home", true); setHidden("#room", false); setHidden("#room-badge", false);
   $("#room-code").textContent = state.code;
+  setHidden("#admin-mode-button", !state.isOwner);
+  if (!state.isOwner && adminMode) disableAdminMode();
   const inLobby = state.game.status === "lobby";
   setHidden("#lobby", !inLobby); setHidden("#game", inLobby); setHidden("#turn-chip", inLobby);
   if (inLobby) renderLobby(); else renderGame();
