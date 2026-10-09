@@ -68,7 +68,7 @@
             <div class="team-column blue-team"><h3><span></span> BLUE</h3><div id="blue-master" class="seat"></div><div id="blue-agent" class="seat"></div></div>
           </div>
           <button id="start-game" class="primary-button" disabled>4人そろったらゲーム開始 <span>→</span></button>
-          <p class="hint-text">席をクリックすると、空いている役割へ移動できます。</p>
+          <p id="lobby-hint" class="hint-text">席をクリックすると、空いている役割へ移動できます。</p>
         </section>
 
         <aside class="panel rules-panel">
@@ -90,6 +90,7 @@
           <div id="guess-controls" class="hidden"><p class="guess-copy">カード本体でマークし、右上のマークを押すと開きます。</p><button id="end-turn" class="secondary-button">次のターンへ</button></div>
           <div id="waiting-copy" class="waiting-copy">相手の行動を待っています…</div>
           <button id="rematch" class="primary-button hidden">もう一度プレイ</button>
+          <button id="return-lobby" class="secondary-button hidden">ルームに戻る</button>
           <div id="owner-game-controls" class="owner-game-controls hidden"><small>ROOM OWNER</small><button id="end-game" class="danger-button">ゲームを終了する</button></div>
           <section class="game-log-section">
             <div class="game-log-head"><p class="eyebrow">MISSION LOG</p><span id="log-count">0</span></div>

@@ -128,7 +128,9 @@ io.on("connection", (socket) => {
   });
 
   socket.on("start-game", () => {
-    const { room } = getPlayer(socket);
+    const { room, player } = getPlayer(socket);
+    if (!room || !player || player.id !== room.ownerId) return error(socket, "ゲームを開始できるのはルーム作成者だけです。");
+    if (room.game.status !== "lobby") return error(socket, "ゲームはすでに始まっています。");
     if (!room || room.players.size !== 4 || SEATS.some((seat) => ![...room.players.values()].some((p) => p.seat === seat))) {
       return error(socket, "4つの役割すべてにプレイヤーが必要です。");
     }
@@ -165,8 +167,9 @@ io.on("connection", (socket) => {
   });
 
   socket.on("rematch", () => {
-    const { room } = getPlayer(socket);
-    if (!room || room.game.status !== "finished") return;
+    const { room, player } = getPlayer(socket);
+    if (!room || !player || player.id !== room.ownerId) return error(socket, "再戦を開始できるのはルーム作成者だけです。");
+    if (room.game.status !== "finished") return error(socket, "終了したゲームがありません。");
     room.game = newGame(Math.random, room.wordPool);
     broadcast(room);
   });
@@ -175,6 +178,20 @@ io.on("connection", (socket) => {
     const { room, player } = getPlayer(socket);
     if (!room || !player || player.id !== room.ownerId) return error(socket, "ゲームを終了できるのはルーム作成者だけです。");
     if (room.game.status !== "playing") return error(socket, "進行中のゲームがありません。");
+    const currentLog = room.game.history?.at(-1);
+    if (currentLog) currentLog.ended = true;
+    room.game.status = "finished";
+    room.game.phase = "finished";
+    room.game.markedCard = null;
+    room.game.winner = null;
+    room.game.message = "ルーム作成者がゲームを終了しました。";
+    broadcast(room);
+  });
+
+  socket.on("return-to-lobby", () => {
+    const { room, player } = getPlayer(socket);
+    if (!room || !player || player.id !== room.ownerId) return error(socket, "ルームに戻せるのはルーム作成者だけです。");
+    if (room.game.status !== "finished") return error(socket, "ゲーム終了後にルームへ戻れます。");
     room.game = { status: "lobby", cards: [] };
     broadcast(room);
   });
