@@ -53,16 +53,13 @@ function makeSeamlessLoopBuffer(context, decoded) {
   const channels = Array.from({ length: decoded.numberOfChannels }, (_, index) => decoded.getChannelData(index));
   const threshold = 0.0005;
   let start = 0;
-  let end = decoded.length;
+  const end = decoded.length;
   const isAudible = (frame) => channels.some((channel) => Math.abs(channel[frame]) >= threshold);
   while (start < end && !isAudible(start)) start += 1;
-  while (end > start && !isAudible(end - 1)) end -= 1;
   const headPadding = Math.round(decoded.sampleRate * 0.008);
-  const tailPadding = Math.round(decoded.sampleRate * 0.07);
   start = Math.max(0, start - headPadding);
-  end = Math.min(decoded.length, end + tailPadding);
   const segmentLength = end - start;
-  const fadeLength = Math.min(Math.round(decoded.sampleRate * 0.05), Math.floor(segmentLength / 4));
+  const fadeLength = Math.min(Math.round(decoded.sampleRate * 0.02), Math.floor(segmentLength / 4));
   if (fadeLength < 2) return decoded;
 
   const middleLength = segmentLength - fadeLength * 2;
