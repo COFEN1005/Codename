@@ -4,6 +4,7 @@ const crypto = require("node:crypto");
 const express = require("express");
 const { Server } = require("socket.io");
 const { WORDS, newGame, submitClue, markCard, guessCard, endTurn, publicGame } = require("./game");
+const { assignSeat } = require("./lobby");
 
 const app = express();
 const server = http.createServer(app);
@@ -43,6 +44,12 @@ function serializeRoom(room, player) {
     wordCount: room.wordPool.length,
     deckName: room.deckName,
     me: player ? { id: player.id, name: player.name, seat: player.seat } : null,
+    participants: [...room.players.values()].map((participant) => ({
+      id: participant.id,
+      name: participant.name,
+      seat: participant.seat,
+      connected: Boolean(participant.socketId)
+    })),
     players: SEATS.map((seat) => {
       const occupant = [...room.players.values()].find((p) => p.seat === seat);
       return { seat, name: occupant?.name || null, connected: Boolean(occupant?.socketId) };
@@ -78,7 +85,7 @@ io.on("connection", (socket) => {
     if (!validName) return error(socket, "名前を入力してください。");
     const code = roomCode();
     const id = String(playerId || crypto.randomUUID()).slice(0, 64);
-    const player = { id, name: validName, seat: "red-master", socketId: socket.id };
+    const player = { id, name: validName, seat: null, socketId: socket.id };
     const room = { code, ownerId: id, wordPool: [...WORDS], deckName: "標準カード", players: new Map([[id, player]]), game: { status: "lobby", cards: [] } };
     rooms.set(code, room);
     enterRoom(socket, room, player);
@@ -96,9 +103,8 @@ io.on("connection", (socket) => {
       return enterRoom(socket, room, returning);
     }
     if (room.game.status !== "lobby") return error(socket, "ゲームはすでに始まっています。");
-    const freeSeat = SEATS.find((seat) => ![...room.players.values()].some((p) => p.seat === seat));
-    if (!freeSeat) return error(socket, "このルームは満員です。");
-    const player = { id, name: validName, seat: freeSeat, socketId: socket.id };
+    if (room.players.size >= 4) return error(socket, "このルームは満員です。");
+    const player = { id, name: validName, seat: null, socketId: socket.id };
     room.players.set(id, player);
     enterRoom(socket, room, player);
   });
@@ -106,9 +112,8 @@ io.on("connection", (socket) => {
   socket.on("change-seat", (seat) => {
     const { room, player } = getPlayer(socket);
     if (!room || !player || room.game.status !== "lobby" || !SEATS.includes(seat)) return;
-    if ([...room.players.values()].some((p) => p.seat === seat)) return error(socket, "その席は使用中です。");
-    player.seat = seat;
-    broadcast(room);
+    try { assignSeat(room.players, player, seat); broadcast(room); }
+    catch (err) { error(socket, err.message); }
   });
 
   socket.on("update-word-pool", (payload) => {
@@ -192,6 +197,7 @@ io.on("connection", (socket) => {
     const { room, player } = getPlayer(socket);
     if (!room || !player || player.id !== room.ownerId) return error(socket, "ルームに戻せるのはルーム作成者だけです。");
     if (room.game.status !== "finished") return error(socket, "ゲーム終了後にルームへ戻れます。");
+    for (const participant of room.players.values()) participant.seat = null;
     room.game = { status: "lobby", cards: [] };
     broadcast(room);
   });

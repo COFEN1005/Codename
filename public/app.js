@@ -406,22 +406,31 @@ async function extendConnection(fromReminder) {
 }
 
 function renderLobby() {
-  const occupied = state.players.filter((p) => p.name).length;
-  $("#game-message").textContent = occupied === 4 ? "カードを選んでゲームを開始できます" : "プレイヤーを待っています";
-  $("#player-count").textContent = `${occupied} / 4`;
+  const assigned = state.players.filter((p) => p.name).length;
+  const joined = state.participants?.length || 0;
+  $("#game-message").textContent = joined < 4 ? "プレイヤーを待っています" : assigned < 4 ? "4つの役割を選んでください" : "カードを選んでゲームを開始できます";
+  $("#player-count").textContent = `${assigned} / 4 ROLES`;
   setHidden("#start-game", !state.isOwner);
-  $("#start-game").disabled = occupied !== 4;
-  $("#start-game").innerHTML = occupied === 4 ? "ゲーム開始 <span>→</span>" : "4人そろったらゲーム開始 <span>→</span>";
-  $("#lobby-hint").textContent = state.isOwner ? "席をクリックすると、空いている役割へ移動できます。" : "ルーム作成者がゲームを開始します。";
+  $("#start-game").disabled = assigned !== 4;
+  $("#start-game").innerHTML = assigned === 4 ? "ゲーム開始 <span>→</span>" : "4つの役割が決まったら開始 <span>→</span>";
+  $("#lobby-hint").textContent = state.isOwner
+    ? "自分の席を押すと役割を外せます。使用中の席を押すと相手と交換します。"
+    : "役割を選んでください。ゲーム開始はルーム作成者が行います。";
   $("#word-count").textContent = `使用中：${state.deckName}（${state.wordCount}語）`;
   setHidden("#open-editor", !state.isOwner);
+
+  $("#participant-list").innerHTML = (state.participants || []).map((participant) => {
+    const mine = participant.id === state.me?.id ? " mine" : "";
+    const offline = participant.connected ? "" : " offline";
+    return `<span class="participant-chip${mine}${offline}"><b>${escapeHtml(participant.name)}</b><small>${participant.seat ? roleLabels[participant.seat] : "役割未選択"}</small></span>`;
+  }).join("");
 
   for (const seat of state.players) {
     const el = document.getElementById(seat.seat);
     const type = seat.seat.endsWith("master") ? "SPYMASTER" : "FIELD AGENT";
     el.className = `seat ${seat.name ? "occupied" : "empty"} ${state.me?.seat === seat.seat ? "mine" : ""}`;
     el.innerHTML = `<div class="seat-icon">${seat.name ? seat.name.charAt(0) : "+"}</div><div><small>${type}</small><strong>${seat.name || "空席"}</strong></div>${seat.name && !seat.connected ? '<i>OFFLINE</i>' : ""}`;
-    el.onclick = () => { if (!seat.name) socket.emit("change-seat", seat.seat); };
+    el.onclick = () => socket.emit("change-seat", seat.seat);
   }
 }
 

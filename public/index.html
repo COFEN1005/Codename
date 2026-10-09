@@ -62,13 +62,14 @@
       <div id="lobby" class="lobby-grid">
         <section class="panel seats-panel">
           <div class="section-heading"><div><p class="eyebrow">TEAM ASSIGNMENT</p><h2>4つの席を埋める</h2></div><span id="player-count">1 / 4</span></div>
+          <div id="participant-list" class="participant-list" aria-label="参加プレイヤー"></div>
           <div class="teams">
             <div class="team-column red-team"><h3><span></span> RED</h3><div id="red-master" class="seat"></div><div id="red-agent" class="seat"></div></div>
             <div class="versus">VS</div>
             <div class="team-column blue-team"><h3><span></span> BLUE</h3><div id="blue-master" class="seat"></div><div id="blue-agent" class="seat"></div></div>
           </div>
           <button id="start-game" class="primary-button" disabled>4人そろったらゲーム開始 <span>→</span></button>
-          <p id="lobby-hint" class="hint-text">席をクリックすると、空いている役割へ移動できます。</p>
+          <p id="lobby-hint" class="hint-text">空いている役割を選択してください。使用中の席を選ぶと役割を交換できます。</p>
         </section>
 
         <aside class="panel rules-panel">
