@@ -9,14 +9,19 @@ let bgmVolume = storedVolume("bgmVolume", 0.14);
 let seVolume = storedVolume("seVolume", 0.22);
 let audioUnlocked = false;
 let currentBgm = null;
+let bgmAudioContext = null;
+let currentBgmSource = null;
+let currentBgmGain = null;
+let bgmRequestId = 0;
+const bgmBufferPromises = new Map();
 let adminMode = false;
 let nextReminderAt = 0;
 let keepAliveTimer = null;
 const KEEP_ALIVE_REMINDER = 10 * 60 * 1000;
 
 const bgmTracks = {
-  lobby: Object.assign(new Audio("/audio/lobby.mp3"), { loop: true, preload: "auto", gain: 0.9 }),
-  battle: Object.assign(new Audio("/audio/battle.mp3"), { loop: true, preload: "auto", gain: 1 })
+  lobby: { src: "/audio/lobby.mp3", gain: 0.9, fallback: Object.assign(new Audio("/audio/lobby.mp3"), { loop: true, preload: "auto" }) },
+  battle: { src: "/audio/battle.mp3", gain: 1, fallback: Object.assign(new Audio("/audio/battle.mp3"), { loop: true, preload: "auto" }) }
 };
 const seTracks = {
   select: { src: "/audio/selectSE.mp3", gain: 0.65 },
@@ -36,7 +41,79 @@ function storedVolume(key, fallback) {
 }
 
 function applyBgmVolume() {
-  for (const track of Object.values(bgmTracks)) track.volume = bgmVolume * track.gain;
+  for (const track of Object.values(bgmTracks)) track.fallback.volume = bgmVolume * track.gain;
+  if (currentBgmGain && currentBgm && bgmAudioContext) {
+    const target = bgmVolume * bgmTracks[currentBgm].gain;
+    currentBgmGain.gain.cancelScheduledValues(bgmAudioContext.currentTime);
+    currentBgmGain.gain.setTargetAtTime(target, bgmAudioContext.currentTime, 0.025);
+  }
+}
+
+function makeSeamlessLoopBuffer(context, decoded) {
+  const channels = Array.from({ length: decoded.numberOfChannels }, (_, index) => decoded.getChannelData(index));
+  const threshold = 0.0015;
+  let start = 0;
+  let end = decoded.length;
+  const isAudible = (frame) => channels.some((channel) => Math.abs(channel[frame]) >= threshold);
+  while (start < end && !isAudible(start)) start += 1;
+  while (end > start && !isAudible(end - 1)) end -= 1;
+  const padding = Math.round(decoded.sampleRate * 0.008);
+  start = Math.max(0, start - padding);
+  end = Math.min(decoded.length, end + padding);
+  const segmentLength = end - start;
+  const fadeLength = Math.min(Math.round(decoded.sampleRate * 0.12), Math.floor(segmentLength / 4));
+  if (fadeLength < 2) return decoded;
+
+  const middleLength = segmentLength - fadeLength * 2;
+  const outputLength = segmentLength - fadeLength;
+  const output = context.createBuffer(decoded.numberOfChannels, outputLength, decoded.sampleRate);
+  channels.forEach((input, channelIndex) => {
+    const result = output.getChannelData(channelIndex);
+    result.set(input.subarray(start + fadeLength, end - fadeLength), 0);
+    for (let i = 0; i < fadeLength; i += 1) {
+      const mix = i / (fadeLength - 1);
+      result[middleLength + i] = input[end - fadeLength + i] * (1 - mix) + input[start + i] * mix;
+    }
+  });
+  return output;
+}
+
+function getBgmContext() {
+  if (!bgmAudioContext) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) throw new Error("Web Audio API is not supported");
+    bgmAudioContext = new AudioContextClass();
+  }
+  return bgmAudioContext;
+}
+
+function loadBgmBuffer(type) {
+  if (!bgmBufferPromises.has(type)) {
+    const context = getBgmContext();
+    const promise = fetch(bgmTracks[type].src)
+      .then((response) => {
+        if (!response.ok) throw new Error(`BGM load failed: ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then((data) => context.decodeAudioData(data))
+      .then((decoded) => makeSeamlessLoopBuffer(context, decoded));
+    bgmBufferPromises.set(type, promise);
+  }
+  return bgmBufferPromises.get(type);
+}
+
+function stopCurrentBgmPlayback() {
+  if (currentBgmSource) {
+    try { currentBgmSource.stop(); } catch {}
+    currentBgmSource.disconnect();
+  }
+  if (currentBgmGain) currentBgmGain.disconnect();
+  currentBgmSource = null;
+  currentBgmGain = null;
+  for (const track of Object.values(bgmTracks)) {
+    track.fallback.pause();
+    track.fallback.currentTime = 0;
+  }
 }
 
 const roleLabels = {
@@ -131,20 +208,40 @@ function updateAudioControls() {
 
 function unlockAudio() {
   audioUnlocked = true;
+  if (bgmAudioContext?.state === "suspended") bgmAudioContext.resume().catch(() => {});
   playBgm(state?.game?.status === "playing" || state?.game?.status === "finished" ? "battle" : "lobby");
 }
 
-function playBgm(type) {
+async function playBgm(type) {
   if (!bgmEnabled || !audioUnlocked || currentBgm === type) return;
-  for (const [name, track] of Object.entries(bgmTracks)) {
-    if (name !== type) { track.pause(); track.currentTime = 0; }
-  }
   currentBgm = type;
-  bgmTracks[type].play().catch(() => { currentBgm = null; });
+  const requestId = ++bgmRequestId;
+  try {
+    const context = getBgmContext();
+    if (context.state === "suspended") await context.resume();
+    const buffer = await loadBgmBuffer(type);
+    if (requestId !== bgmRequestId || currentBgm !== type || !bgmEnabled) return;
+    stopCurrentBgmPlayback();
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(gain).connect(context.destination);
+    gain.gain.setValueAtTime(0, context.currentTime);
+    gain.gain.linearRampToValueAtTime(bgmVolume * bgmTracks[type].gain, context.currentTime + 0.12);
+    source.start();
+    currentBgmSource = source;
+    currentBgmGain = gain;
+  } catch {
+    if (requestId !== bgmRequestId || currentBgm !== type || !bgmEnabled) return;
+    stopCurrentBgmPlayback();
+    bgmTracks[type].fallback.play().catch(() => { currentBgm = null; });
+  }
 }
 
 function stopBgm() {
-  for (const track of Object.values(bgmTracks)) track.pause();
+  bgmRequestId += 1;
+  stopCurrentBgmPlayback();
   currentBgm = null;
 }
 
