@@ -49,33 +49,6 @@ function applyBgmVolume() {
   }
 }
 
-function makeSeamlessLoopBuffer(context, decoded) {
-  const channels = Array.from({ length: decoded.numberOfChannels }, (_, index) => decoded.getChannelData(index));
-  const threshold = 0.0005;
-  let start = 0;
-  const end = decoded.length;
-  const isAudible = (frame) => channels.some((channel) => Math.abs(channel[frame]) >= threshold);
-  while (start < end && !isAudible(start)) start += 1;
-  const headPadding = Math.round(decoded.sampleRate * 0.008);
-  start = Math.max(0, start - headPadding);
-  const segmentLength = end - start;
-  const fadeLength = Math.min(Math.round(decoded.sampleRate * 0.02), Math.floor(segmentLength / 4));
-  if (fadeLength < 2) return decoded;
-
-  const middleLength = segmentLength - fadeLength * 2;
-  const outputLength = segmentLength - fadeLength;
-  const output = context.createBuffer(decoded.numberOfChannels, outputLength, decoded.sampleRate);
-  channels.forEach((input, channelIndex) => {
-    const result = output.getChannelData(channelIndex);
-    result.set(input.subarray(start + fadeLength, end - fadeLength), 0);
-    for (let i = 0; i < fadeLength; i += 1) {
-      const mix = i / (fadeLength - 1);
-      result[middleLength + i] = input[end - fadeLength + i] * (1 - mix) + input[start + i] * mix;
-    }
-  });
-  return output;
-}
-
 function getBgmContext() {
   if (!bgmAudioContext) {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -93,8 +66,7 @@ function loadBgmBuffer(type) {
         if (!response.ok) throw new Error(`BGM load failed: ${response.status}`);
         return response.arrayBuffer();
       })
-      .then((data) => context.decodeAudioData(data))
-      .then((decoded) => makeSeamlessLoopBuffer(context, decoded));
+      .then((data) => context.decodeAudioData(data));
     bgmBufferPromises.set(type, promise);
   }
   return bgmBufferPromises.get(type);
