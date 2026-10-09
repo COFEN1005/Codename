@@ -4,9 +4,9 @@ const playerId = localStorage.playerId || (localStorage.playerId = crypto.random
 let state = null;
 let importedDeck = null;
 let adminMode = false;
-let nextKeepAliveAt = 0;
+let nextReminderAt = 0;
 let keepAliveTimer = null;
-const KEEP_ALIVE_INTERVAL = 10 * 60 * 1000;
+const KEEP_ALIVE_REMINDER = 10 * 60 * 1000;
 
 const roleLabels = {
   "red-master": "レッド・マスター", "red-agent": "レッド・エージェント",
@@ -36,6 +36,12 @@ $("#rematch").onclick = () => socket.emit("rematch");
 $("#admin-mode-button").onclick = enableAdminMode;
 $("#close-admin").onclick = disableAdminMode;
 $("#keep-alive-now").onclick = () => extendConnection(false);
+$("#reminder-extend").onclick = () => extendConnection(true);
+$("#reminder-snooze").onclick = () => {
+  setHidden("#keep-alive-reminder", true);
+  nextReminderAt = Date.now() + 60_000;
+  updateKeepAliveCountdown();
+};
 
 $("#clue-form").onsubmit = (event) => {
   event.preventDefault();
@@ -80,20 +86,17 @@ async function importDeckFile(event) {
 
 function setHidden(selector, hidden) { $(selector).classList.toggle("hidden", hidden); }
 
-async function enableAdminMode() {
+function enableAdminMode() {
   if (!state?.isOwner) return;
   adminMode = true;
   document.body.classList.add("admin-active");
   setHidden("#admin-console", false);
   $("#admin-mode-button").classList.add("active");
   $("#admin-mode-button").lastChild.textContent = " 管理者モード ON";
-  nextKeepAliveAt = Date.now() + KEEP_ALIVE_INTERVAL;
+  nextReminderAt = Date.now() + KEEP_ALIVE_REMINDER;
   updateKeepAliveCountdown();
   clearInterval(keepAliveTimer);
   keepAliveTimer = setInterval(updateKeepAliveCountdown, 1000);
-  if ($("#admin-notifications").checked && "Notification" in window && Notification.permission === "default") {
-    await Notification.requestPermission();
-  }
   toast("管理者モードを起動しました");
 }
 
@@ -101,6 +104,7 @@ function disableAdminMode() {
   adminMode = false;
   document.body.classList.remove("admin-active");
   setHidden("#admin-console", true);
+  setHidden("#keep-alive-reminder", true);
   $("#admin-mode-button").classList.remove("active");
   $("#admin-mode-button").lastChild.textContent = " 管理者モード";
   clearInterval(keepAliveTimer);
@@ -109,35 +113,35 @@ function disableAdminMode() {
 
 function updateKeepAliveCountdown() {
   if (!adminMode || !state?.isOwner) return;
-  const left = Math.max(0, nextKeepAliveAt - Date.now());
+  const left = Math.max(0, nextReminderAt - Date.now());
   const minutes = Math.floor(left / 60000);
   const seconds = Math.floor((left % 60000) / 1000);
   $("#keep-alive-countdown").textContent = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  if (left === 0) extendConnection(true);
+  if (left === 0) setHidden("#keep-alive-reminder", false);
 }
 
-async function extendConnection(automatic) {
+async function extendConnection(fromReminder) {
   if (!state?.isOwner || !adminMode) return;
   const button = $("#keep-alive-now");
+  const reminderButton = $("#reminder-extend");
   button.disabled = true;
+  reminderButton.disabled = true;
   try {
-    const response = await fetch("/keep-alive", { method: "POST", cache: "no-store" });
-    if (!response.ok) throw new Error("接続延長に失敗しました");
-    const result = await response.json();
+    const result = await new Promise((resolve, reject) => {
+      socket.timeout(5000).emit("keep-alive", (timeoutError, reply) => timeoutError ? reject(new Error("サーバーに接続できません。")) : resolve(reply));
+    });
+    if (!result?.ok) throw new Error(result?.error || "接続延長に失敗しました");
     const time = new Date(result.extendedAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
     $("#last-keep-alive").textContent = `${time} に延長済み`;
-    nextKeepAliveAt = Date.now() + KEEP_ALIVE_INTERVAL;
+    nextReminderAt = Date.now() + KEEP_ALIVE_REMINDER;
+    setHidden("#keep-alive-reminder", true);
     updateKeepAliveCountdown();
-    const message = automatic ? "接続を自動延長しました。次回は10分後です。" : "接続を延長しました。次回は10分後です。";
-    toast(message);
-    if (automatic && $("#admin-notifications").checked && "Notification" in window && Notification.permission === "granted") {
-      new Notification("SIGNAL WORDS", { body: message, tag: "signal-words-keep-alive" });
-    }
+    toast(fromReminder ? "接続を延長しました。" : "接続を延長しました。10分後に確認します。");
   } catch (error) {
     toast(error.message);
-    nextKeepAliveAt = Date.now() + 60_000;
   } finally {
     button.disabled = false;
+    reminderButton.disabled = false;
   }
 }
 

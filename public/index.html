@@ -84,11 +84,21 @@
 
   <aside id="admin-console" class="admin-console hidden" aria-label="管理者コンソール">
     <div class="admin-console-head"><div><span class="admin-live-dot"></span><small>ADMIN MODE</small><strong>接続管理</strong></div><button id="close-admin" class="icon-button" title="管理者モードを終了">×</button></div>
-    <p>この画面を開いている間、10分ごとにRenderへの接続を自動延長します。</p>
-    <div class="keep-alive-status"><span>次回の自動延長</span><strong id="keep-alive-countdown">10:00</strong></div>
+    <p>手動で接続を延長できます。10分間延長されていない場合は画面にお知らせします。</p>
+    <div class="keep-alive-status"><span>延長確認まで</span><strong id="keep-alive-countdown">10:00</strong></div>
     <button id="keep-alive-now" class="keep-alive-button"><span>↻</span><span><b>今すぐ接続延長</b><small id="last-keep-alive">まだ延長していません</small></span></button>
-    <label class="notification-row"><input id="admin-notifications" type="checkbox" checked><span>自動延長時に通知する</span></label>
   </aside>
+
+  <div id="keep-alive-reminder" class="reminder-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="reminder-title">
+    <section class="reminder-card">
+      <span class="reminder-icon">!</span>
+      <p class="eyebrow">CONNECTION CHECK</p>
+      <h2 id="reminder-title">接続を延長しますか？</h2>
+      <p>最後の接続延長から10分以上経過しました。Renderが休止する前に手動で延長できます。</p>
+      <button id="reminder-extend" class="primary-button">今すぐ接続延長 <span>↻</span></button>
+      <button id="reminder-snooze" class="reminder-snooze">1分後にもう一度表示</button>
+    </section>
+  </div>
 
   <dialog id="word-editor">
     <form method="dialog" class="editor-card">

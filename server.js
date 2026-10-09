@@ -14,10 +14,6 @@ const SEATS = ["red-master", "red-agent", "blue-master", "blue-agent"];
 
 app.disable("x-powered-by");
 app.get("/health", (_req, res) => res.json({ ok: true }));
-app.post("/keep-alive", (_req, res) => {
-  res.set("Cache-Control", "no-store");
-  res.json({ ok: true, extendedAt: new Date().toISOString() });
-});
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/*splat", (_req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
@@ -166,6 +162,15 @@ io.on("connection", (socket) => {
     if (!room || room.game.status !== "finished") return;
     room.game = newGame(Math.random, room.wordPool);
     broadcast(room);
+  });
+
+  socket.on("keep-alive", (ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    const { room, player } = getPlayer(socket);
+    if (!room || !player || player.id !== room.ownerId) {
+      return reply({ ok: false, error: "接続を延長できるのはルーム作成者だけです。" });
+    }
+    reply({ ok: true, extendedAt: new Date().toISOString() });
   });
 
   socket.on("disconnect", () => {
