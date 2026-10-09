@@ -194,9 +194,27 @@ function renderGame() {
     button.onclick = () => socket.emit("guess-card", index);
     board.appendChild(button);
   });
+  renderGameLog(game.history || []);
+}
+
+function renderGameLog(history) {
+  $("#log-count").textContent = history.length;
+  const log = $("#game-log");
+  if (!history.length) {
+    log.innerHTML = '<p class="empty-log">最初のヒントを待っています。</p>';
+    return;
+  }
+  log.innerHTML = [...history].reverse().map((entry, reverseIndex) => {
+    const turnNumber = history.length - reverseIndex;
+    const guesses = entry.guesses.length
+      ? entry.guesses.map((guess, index) => `<li><b>${index + 1}</b><span>${escapeHtml(guess.word)}</span><i class="log-role ${guess.role}">${roleLabel(guess.role)}</i></li>`).join("")
+      : '<li class="no-guess">まだカードを開いていません</li>';
+    return `<article class="log-entry ${entry.team}"><header><span>TURN ${String(turnNumber).padStart(2, "0")}</span><strong>${escapeHtml(entry.clue.word)} <b>${entry.clue.count}</b></strong><i>${entry.team === "red" ? "RED" : "BLUE"}</i></header><ol>${guesses}</ol></article>`;
+  }).join("");
 }
 
 function roleMark(role) { return ({ red: "●", blue: "●", neutral: "◆", assassin: "×" })[role] || ""; }
+function roleLabel(role) { return ({ red: "RED", blue: "BLUE", neutral: "NEUTRAL", assassin: "ASSASSIN" })[role] || ""; }
 function escapeHtml(text) { const div = document.createElement("div"); div.textContent = text; return div.innerHTML; }
 
 function render() {

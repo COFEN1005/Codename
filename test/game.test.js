@@ -23,6 +23,23 @@ test("clue allows count plus one guesses", () => {
   submitClue(game, game.turn, "空", 2);
   assert.equal(game.phase, "guess");
   assert.equal(game.guessesLeft, 3);
+  assert.deepEqual(game.history[0], {
+    team: game.turn,
+    clue: { word: "空", count: 2 },
+    guesses: [],
+    ended: false
+  });
+});
+
+test("history connects guesses to the active clue", () => {
+  const game = newGame(() => 0.1);
+  const team = game.turn;
+  submitClue(game, team, "自然", 2);
+  const matchingIndex = game.cards.findIndex((card) => card.role === team);
+  const selected = game.cards[matchingIndex];
+  guessCard(game, team, matchingIndex);
+  assert.deepEqual(game.history[0].guesses, [{ word: selected.word, role: team }]);
+  assert.equal(game.history[0].ended, false);
 });
 
 test("assassin ends game for opposite team", () => {

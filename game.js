@@ -47,6 +47,7 @@ function newGame(random = Math.random, wordPool = WORDS) {
     phase: "clue",
     clue: null,
     guessesLeft: 0,
+    history: [],
     winner: null,
     message: `${teamName(board.startingTeam)}のスパイマスターがヒントを出してください。`
   };
@@ -74,12 +75,20 @@ function submitClue(game, team, word, count) {
     throw new Error("盤面と同じ単語はヒントに使えません。");
   }
   game.clue = { word: cleanWord, count: cleanCount };
+  game.history.push({
+    team,
+    clue: { word: cleanWord, count: cleanCount },
+    guesses: [],
+    ended: false
+  });
   game.guessesLeft = cleanCount + 1;
   game.phase = "guess";
   game.message = `${teamName(team)}のエージェントがカードを選んでください。`;
 }
 
 function endTurn(game) {
+  const currentLog = game.history?.at(-1);
+  if (currentLog && !currentLog.ended) currentLog.ended = true;
   game.turn = game.turn === "red" ? "blue" : "red";
   game.phase = "clue";
   game.clue = null;
@@ -94,11 +103,14 @@ function guessCard(game, team, index) {
   const card = game.cards[index];
   if (!card || card.revealed) throw new Error("そのカードは選べません。");
   card.revealed = true;
+  const currentLog = game.history?.at(-1);
+  if (currentLog) currentLog.guesses.push({ word: card.word, role: card.role });
   game.guessesLeft -= 1;
 
   if (card.role === "assassin") {
     game.status = "finished";
     game.winner = team === "red" ? "blue" : "red";
+    if (currentLog) currentLog.ended = true;
     game.message = `暗殺者！ ${teamName(game.winner)}の勝利です。`;
     return;
   }
@@ -107,6 +119,7 @@ function guessCard(game, team, index) {
     if (remaining(game, candidate) === 0) {
       game.status = "finished";
       game.winner = candidate;
+      if (currentLog) currentLog.ended = true;
       game.message = `${teamName(candidate)}が全エージェントを発見しました！`;
       return;
     }
