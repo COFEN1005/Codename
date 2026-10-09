@@ -62,10 +62,22 @@ test("a card must be marked before it can be revealed", () => {
   const index = game.cards.findIndex((card) => card.role === team);
   assert.throws(() => guessCard(game, team, index), /マーク/);
   markCard(game, team, index);
-  assert.equal(game.markedCard, index);
+  assert.deepEqual(game.markedCards, [index]);
   guessCard(game, team, index);
   assert.equal(game.cards[index].revealed, true);
-  assert.equal(game.markedCard, null);
+  assert.deepEqual(game.markedCards, []);
+});
+
+test("multiple cards can stay marked until each is revealed", () => {
+  const game = newGame(() => 0.1);
+  const team = game.turn;
+  submitClue(game, team, "複数", 2);
+  const indices = game.cards.map((card, index) => card.role === team ? index : -1).filter((index) => index >= 0).slice(0, 2);
+  markCard(game, team, indices[0]);
+  markCard(game, team, indices[1]);
+  assert.deepEqual(game.markedCards, indices);
+  guessCard(game, team, indices[0]);
+  assert.deepEqual(game.markedCards, [indices[1]]);
 });
 
 test("field agents cannot see unrevealed key", () => {

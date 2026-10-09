@@ -453,7 +453,7 @@ function renderGame() {
   const board = $("#board"); board.innerHTML = "";
   game.cards.forEach((card, index) => {
     const button = document.createElement("button");
-    const marked = game.markedCard === index;
+    const marked = game.markedCards?.includes(index);
     button.className = `word-card ${card.role || "unknown"} ${card.revealed ? "revealed" : ""} ${marked ? `marked marked-${game.turn}` : ""}`;
     button.innerHTML = `<span>${escapeHtml(card.word)}</span>${card.role && !card.revealed ? `<i class="role-key">${roleMark(card.role)}</i>` : ""}${marked ? `<span class="card-marker" title="このカードを開く"><b>✓</b><small>OPEN</small></span>` : ""}`;
     button.disabled = card.revealed || !(myAction && !isMaster);

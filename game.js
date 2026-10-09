@@ -47,7 +47,7 @@ function newGame(random = Math.random, wordPool = WORDS) {
     phase: "clue",
     clue: null,
     guessesLeft: 0,
-    markedCard: null,
+    markedCards: [],
     history: [],
     winner: null,
     message: `${teamName(board.startingTeam)}のスパイマスターがヒントを出してください。`
@@ -76,7 +76,7 @@ function submitClue(game, team, word, count) {
     throw new Error("盤面と同じ単語はヒントに使えません。");
   }
   game.clue = { word: cleanWord, count: cleanCount };
-  game.markedCard = null;
+  game.markedCards = [];
   game.history.push({
     team,
     clue: { word: cleanWord, count: cleanCount },
@@ -95,7 +95,7 @@ function endTurn(game) {
   game.phase = "clue";
   game.clue = null;
   game.guessesLeft = 0;
-  game.markedCard = null;
+  game.markedCards = [];
   game.message = `${teamName(game.turn)}のスパイマスターがヒントを出してください。`;
 }
 
@@ -105,7 +105,10 @@ function markCard(game, team, index) {
   }
   const card = game.cards[index];
   if (!card || card.revealed) throw new Error("そのカードにはマークできません。");
-  game.markedCard = game.markedCard === index ? null : index;
+  const markedCards = game.markedCards || (game.markedCards = []);
+  game.markedCards = markedCards.includes(index)
+    ? markedCards.filter((markedIndex) => markedIndex !== index)
+    : [...markedCards, index];
 }
 
 function guessCard(game, team, index) {
@@ -114,9 +117,9 @@ function guessCard(game, team, index) {
   }
   const card = game.cards[index];
   if (!card || card.revealed) throw new Error("そのカードは選べません。");
-  if (game.markedCard !== index) throw new Error("先にカードへマークしてください。");
+  if (!game.markedCards?.includes(index)) throw new Error("先にカードへマークしてください。");
   card.revealed = true;
-  game.markedCard = null;
+  game.markedCards = game.markedCards.filter((markedIndex) => markedIndex !== index);
   const currentLog = game.history?.at(-1);
   if (currentLog) currentLog.guesses.push({ word: card.word, role: card.role });
   game.guessesLeft -= 1;

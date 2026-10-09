@@ -182,7 +182,7 @@ io.on("connection", (socket) => {
     if (currentLog) currentLog.ended = true;
     room.game.status = "finished";
     room.game.phase = "finished";
-    room.game.markedCard = null;
+    room.game.markedCards = [];
     room.game.winner = null;
     room.game.message = "ルーム作成者がゲームを終了しました。";
     broadcast(room);
